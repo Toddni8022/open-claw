@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Sand</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        #canvas {
+            border: 3px solid #333;
+            border-radius: 8px;
+            cursor: crosshair;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .sidebar {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            width: 180px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar h2 {
+            color: #fff;
+            font-size: 18px;
+            margin-bottom: 15px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .element-btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .element-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .element-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px currentColor;
+        }
+        .element-btn.active::after {
+            content: '✓';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        #sand { background: linear-gradient(135deg, #f4d03f, #c9a227); color: #333; }
+        #water { background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; }
+        #fire { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+        #wood { background: linear-gradient(135deg, #8B4513, #654321); color: #fff; }
+        #plant { background: linear-gradient(135deg, #27ae60, #1e8449); color: #fff; }
+        #stone { background: linear-gradient(135deg, #7f8c8d, #566573); color: #fff; }
+        #oil { background: linear-gradient(135deg, #2c2c2c, #1a1a1a); color: #fff; }
+        #acid { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: #fff; }
+        #lava { background: linear-gradient(135deg, #ff6b35, #d63031); color: #fff; }
+        #ice { background: linear-gradient(135deg, #a8e6cf, #88d8c0); color: #333; }
+        #eraser { background: linear-gradient(135deg, #ecf0f1, #bdc3c7); color: #333; }
+        
+        .controls {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .controls label {
+            color: #aaa;
+            font-size: 12px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .controls input[type="range"] {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .clear-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+        }
+        .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(231, 76, 60, 0.4);
+        }
+        .stats {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #888;
+            font-size: 11px;
+            text-align: center;
+        }
+        .hotkeys {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #666;
+            font-size: 10px;
+            line-height: 1.8;
+        }
+        .hotkeys kbd {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas" width="600" height="500"></canvas>
+        <div class="sidebar">
+            <h2>Elements</h2>
+            <button class="element-btn active" id="sand" data-element="sand">Sand</button>
+            <button class="element-btn" id="water" data-element="water">Water</button>
+            <button class="element-btn" id="fire" data-element="fire">Fire</button>
+            <button class="element-btn" id="wood" data-element="wood">Wood</button>
+            <button class="element-btn" id="plant" data-element="plant">Plant</button>
+            <button class="element-btn" id="stone" data-element="stone">Stone</button>
+            <button class="element-btn" id="oil" data-element="oil">Oil</button>
+            <button class="element-btn" id="acid" data-element="acid">Acid</button>
+            <button class="element-btn" id="lava" data-element="lava">Lava</button>
+            <button class="element-btn" id="ice" data-element="ice">Ice</button>
+            <button class="element-btn" id="eraser" data-element="empty">Eraser</button>
+            
+            <div class="controls">
+                <label>Brush Size: <span id="sizeValue">3</span></label>
+                <input type="range" id="brushSize" min="1" max="15" value="3">
+                <button class="clear-btn" id="clearBtn">Clear All</button>
+            </div>
+            
+            <div class="stats">
+                Particles: <span id="particleCount">0</span>
+            </div>
+            
+            <div class="hotkeys">
+                <kbd>1-9,0</kbd> Select element<br>
+                <kbd>E</kbd> Eraser<br>
+                <kbd>C</kbd> Clear<br>
+                <kbd>[ ]</kbd> Brush size
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const CELL_SIZE = 4;
+        const COLS = canvas.width / CELL_SIZE;
+        const ROWS = canvas.height / CELL_SIZE;
+        
+        // Grid state
+        let grid = [];
+        let nextGrid = [];
+        
+        // Element types
+        const EMPTY = 0;
+        const SAND = 1;
+        const WATER = 2;
+        const FIRE = 3;
+        const WOOD = 4;
+        const PLANT = 5;
+        const STONE = 6;
+        const OIL = 7;
+        const ACID = 8;
+        const LAVA = 9;
+        const ICE = 10;
+        const STEAM = 11;
+        
+        // Current tool
+        let currentElement = SAND;
+        let brushSize = 3;
+        let isDrawing = false;
+        
+        // Element colors with variations
+        const colors = {
+            [EMPTY]: () => null,
+            [SAND]: () => `hsl(45, ${70 + Math.random() * 20}%, ${55 + Math.random() * 15}%)`,
+            [WATER]: () => `hsla(210, ${70 + Math.random() * 20}%, ${50 + Math.random() * 15}%, 0.8)`,
+            [FIRE]: () => `hsl(${Math.random() * 30}, 100%, ${50 + Math.random() * 30}%)`,
+            [WOOD]: () => `hsl(25, ${40 + Math.random() * 20}%, ${25 + Math.random() * 15}%)`,
+            [PLANT]: () => `hsl(${100 + Math.random() * 40}, ${50 + Math.random() * 30}%, ${30 + Math.random() * 20}%)`,
+            [STONE]: () => `hsl(0, 0%, ${40 + Math.random() * 20}%)`,
+            [OIL]: () => `hsl(30, 30%, ${10 + Math.random() * 10}%)`,
+            [ACID]: () => `hsl(${280 + Math.random() * 20}, ${70 + Math.random() * 20}%, ${40 + Math.random() * 20}%)`,
+            [LAVA]: () => `hsl(${Math.random() * 30}, 100%, ${40 + Math.random() * 20}%)`,
+            [ICE]: () => `hsl(180, ${60 + Math.random() * 20}%, ${80 + Math.random() * 15}%)`,
+            [STEAM]: () => `hsla(0, 0%, ${80 + Math.random() * 20}%, 0.5)`
+        };
+        
+        // Initialize grids
+        function initGrid() {
+            grid = [];
+            nextGrid = [];
+            for (let y = 0; y < ROWS; y++) {
+                grid[y] = [];
+                nextGrid[y] = [];
+                for (let x = 0; x < COLS; x++) {
+                    grid[y][x] = { type: EMPTY, color: null, updated: false };
+                    nextGrid[y][x] = { type: EMPTY, color: null, updated: false };
+                }
+            }
+        }
+        
+        function getCell(x, y) {
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return { type: STONE };
+            return grid[y][x];
+        }
+        
+        function setCell(x, y, type, color = null) {
+            if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+            nextGrid[y][x] = { 
+                type, 
+                color: color || (type !== EMPTY ? colors[type]() : null),
+                updated: true 
+            };
+        }
+        
+        function isEmpty(x, y) {
+            return getCell(x, y).type === EMPTY;
+        }
+        
+        function isLiquid(type) {
+            return type === WATER || type === OIL || type === ACID || type === LAVA;
+        }
+        
+        function canDisplace(mover, target) {
+            if (target === EMPTY) return true;
+            if (mover === SAND && (target === WATER || target === OIL)) return true;
+            if (mover === LAVA && target === WATER) return true;
+            return false;
+        }
+        
+        // Update functions for each element
+        function updateSand(x, y, cell) {
+            const below = getCell(x, y + 1);
+            const belowLeft = getCell(x - 1, y + 1);
+            const belowRight = getCell(x + 1, y + 1);
+            
+            if (canDisplace(SAND, below.type)) {
+                if (below.type !== EMPTY) {
+                    setCell(x, y, below.type, below.color);
+                } else {
+                    setCell(x, y, EMPTY);
+                }
+                setCell(x, y + 1, SAND, cell.color);
+            } else if (canDisplace(SAND, belowLeft.type) && Math.random() > 0.5) {
+                if (belowLeft.type !== EMPTY) setCell(x, y, belowLeft.type, belowLeft.color);
+                else setCell(x, y, EMPTY);
+                setCell(x - 1, y + 1, SAND, cell.color);
+            } else if (canDisplace(SAND, belowRight.type)) {
+                if (belowRight.type !== EMPTY) setCell(x, y, belowRight.type, belowRight.color);
+                else setCell(x, y, EMPTY);
+                setCell(x + 1, y + 1, SAND, cell.color);
+            } else {
+                setCell(x, y, SAND, cell.color);
+            }
+        }
+        
+        function updateWater(x, y, cell) {
+            const below = getCell(x, y + 1);
+            const left = getCell(x - 1, y);
+            const right = getCell(x + 1, y);
+            const belowLeft = getCell(x - 1, y + 1);
+            const belowRight = getCell(x + 1, y + 1);
+            
+            if (below.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x, y + 1, WATER, cell.color);
+            } else if (belowLeft.type === EMPTY && Math.random() > 0.5) {
+                setCell(x, y, EMPTY);
+                setCell(x - 1, y + 1, WATER, cell.color);
+            } else if (belowRight.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x + 1, y + 1, WATER, cell.color);
+            } else if (left.type === EMPTY && Math.random() > 0.5) {
+                setCell(x, y, EMPTY);
+                setCell(x - 1, y, WATER, cell.color);
+            } else if (right.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x + 1, y, WATER, cell.color);
+            } else {
+                setCell(x, y, WATER, cell.color);
+            }
+        }
+        
+        function updateFire(x, y, cell) {
+            // Fire rises and dies
+            if (Math.random() < 0.1) {
+                setCell(x, y, EMPTY);
+                return;
+            }
+            
+            // Spread to nearby flammable materials
+            const neighbors = [
+                [x-1, y], [x+1, y], [x, y-1], [x, y+1],
+                [x-1, y-1], [x+1, y-1], [x-1, y+1], [x+1, y+1]
+            ];
+            
+            for (let [nx, ny] of neighbors) {
+                const neighbor = getCell(nx, ny);
+                if (neighbor.type === WOOD || neighbor.type === PLANT || neighbor.type === OIL) {
+                    if (Math.random() < 0.05) {
+                        setCell(nx, ny, FIRE);
+                    }
+                }
+                if (neighbor.type === ICE && Math.random() < 0.1) {
+                    setCell(nx, ny, WATER);
+                }
+            }
+            
+            // Rise
+            const above = getCell(x, y - 1);
+            if (above.type === EMPTY && Math.random() > 0.3) {
+                setCell(x, y, EMPTY);
+                setCell(x, y - 1, FIRE);
+            } else if (Math.random() < 0.2) {
+                setCell(x, y, EMPTY);
+            } else {
+                setCell(x, y, FIRE, colors[FIRE]());
+            }
+        }
+        
+        function updateWood(x, y, cell) {
+            setCell(x, y, WOOD, cell.color);
+        }
+        
+        function updatePlant(x, y, cell) {
+            // Grow when touching water
+            const neighbors = [[x-1, y], [x+1, y], [x, y-1], [x, y+1]];
+            
+            for (let [nx, ny] of neighbors) {
+                const neighbor = getCell(nx, ny);
+                if (neighbor.type === WATER && Math.random() < 0.02) {
+                    setCell(nx, ny, PLANT);
+                }
+            }
+            
+            // Random growth upward
+            const above = getCell(x, y - 1);
+            if (above.type === EMPTY && Math.random() < 0.001) {
+                setCell(x, y - 1, PLANT);
+            }
+            
+            setCell(x, y, PLANT, cell.color);
+        }
+        
+        function updateStone(x, y, cell) {
+            setCell(x, y, STONE, cell.color);
+        }
+        
+        function updateOil(x, y, cell) {
+            const below = getCell(x, y + 1);
+            const left = getCell(x - 1, y);
+            const right = getCell(x + 1, y);
+            
+            // Oil floats on water
+            if (below.type === WATER) {
+                setCell(x, y, WATER, below.color);
+                setCell(x, y + 1, OIL, cell.color);
+            } else if (below.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x, y + 1, OIL, cell.color);
+            } else if (left.type === EMPTY && Math.random() > 0.6) {
+                setCell(x, y, EMPTY);
+                setCell(x - 1, y, OIL, cell.color);
+            } else if (right.type === EMPTY && Math.random() > 0.4) {
+                setCell(x, y, EMPTY);
+                setCell(x + 1, y, OIL, cell.color);
+            } else {
+                setCell(x, y, OIL, cell.color);
+            }
+        }
+        
+        function updateAcid(x, y, cell) {
+            const below = getCell(x, y + 1);
+            const neighbors = [[x-1, y], [x+1, y], [x, y+1]];
+            
+            // Dissolve things
+            for (let [nx, ny] of neighbors) {
+                const neighbor = getCell(nx, ny);
+                if (neighbor.type !== EMPTY && neighbor.type !== ACID && neighbor.type !== STONE && neighbor.type !== LAVA) {
+                    if (Math.random() < 0.05) {
+                        setCell(nx, ny, EMPTY);
+                        if (Math.random() < 0.3) {
+                            setCell(x, y, EMPTY);
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            // Flow like water
+            if (below.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x, y + 1, ACID, cell.color);
+            } else if (getCell(x - 1, y).type === EMPTY && Math.random() > 0.5) {
+                setCell(x, y, EMPTY);
+                setCell(x - 1, y, ACID, cell.color);
+            } else if (getCell(x + 1, y).type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x + 1, y, ACID, cell.color);
+            } else {
+                setCell(x, y, ACID, cell.color);
+            }
+        }
+        
+        function updateLava(x, y, cell) {
+            const below = getCell(x, y + 1);
+            const neighbors = [[x-1, y], [x+1, y], [x, y-1], [x, y+1]];
+            
+            // Interactions
+            for (let [nx, ny] of neighbors) {
+                const neighbor = getCell(nx, ny);
+                if (neighbor.type === WATER) {
+                    setCell(nx, ny, STONE);
+                    if (Math.random() < 0.3) setCell(x, y, STONE, colors[STONE]());
+                }
+                if (neighbor.type === ICE) {
+                    setCell(nx, ny, WATER);
+                }
+                if ((neighbor.type === WOOD || neighbor.type === PLANT || neighbor.type === OIL) && Math.random() < 0.1) {
+                    setCell(nx, ny, FIRE);
+                }
+            }
+            
+            // Flow slowly
+            if (below.type === EMPTY && Math.random() > 0.3) {
+                setCell(x, y, EMPTY);
+                setCell(x, y + 1, LAVA, cell.color);
+            } else if (getCell(x - 1, y).type === EMPTY && Math.random() > 0.8) {
+                setCell(x, y, EMPTY);
+                setCell(x - 1, y, LAVA, cell.color);
+            } else if (getCell(x + 1, y).type === EMPTY && Math.random() > 0.8) {
+                setCell(x, y, EMPTY);
+                setCell(x + 1, y, LAVA, cell.color);
+            } else {
+                setCell(x, y, LAVA, colors[LAVA]());
+            }
+        }
+        
+        function updateIce(x, y, cell) {
+            // Freeze nearby water
+            const neighbors = [[x-1, y], [x+1, y], [x, y-1], [x, y+1]];
+            for (let [nx, ny] of neighbors) {
+                const neighbor = getCell(nx, ny);
+                if (neighbor.type === WATER && Math.random() < 0.01) {
+                    setCell(nx, ny, ICE);
+                }
+            }
+            setCell(x, y, ICE, cell.color);
+        }
+        
+        function updateSteam(x, y, cell) {
+            if (Math.random() < 0.02) {
+                setCell(x, y, EMPTY);
+                return;
+            }
+            
+            const above = getCell(x, y - 1);
+            if (above.type === EMPTY) {
+                setCell(x, y, EMPTY);
+                setCell(x, y - 1, STEAM, cell.color);
+            } else if (Math.random() < 0.05) {
+                // Condense back to water
+                setCell(x, y, WATER);
+            } else {
+                setCell(x, y, STEAM, cell.color);
+            }
+        }
+        
+        // Main update loop
+        function update() {
+            // Copy grid to nextGrid
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    nextGrid[y][x] = { ...grid[y][x], updated: false };
+                }
+            }
+            
+            // Process from bottom to top for falling particles
+            for (let y = ROWS - 1; y >= 0; y--) {
+                // Randomize horizontal order for more natural flow
+                const xOrder = Math.random() > 0.5 ? 
+                    [...Array(COLS).keys()] : 
+                    [...Array(COLS).keys()].reverse();
+                    
+                for (let x of xOrder) {
+                    const cell = grid[y][x];
+                    if (cell.type === EMPTY || nextGrid[y][x].updated) continue;
+                    
+                    switch (cell.type) {
+                        case SAND: updateSand(x, y, cell); break;
+                        case WATER: updateWater(x, y, cell); break;
+                        case FIRE: updateFire(x, y, cell); break;
+                        case WOOD: updateWood(x, y, cell); break;
+                        case PLANT: updatePlant(x, y, cell); break;
+                        case STONE: updateStone(x, y, cell); break;
+                        case OIL: updateOil(x, y, cell); break;
+                        case ACID: updateAcid(x, y, cell); break;
+                        case LAVA: updateLava(x, y, cell); break;
+                        case ICE: updateIce(x, y, cell); break;
+                        case STEAM: updateSteam(x, y, cell); break;
+                    }
+                }
+            }
+            
+            // Swap grids
+            [grid, nextGrid] = [nextGrid, grid];
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#0f0f1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            let count = 0;
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    const cell = grid[y][x];
+                    if (cell.type !== EMPTY && cell.color) {
+                        ctx.fillStyle = cell.color;
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                        count++;
+                    }
+                }
+            }
+            
+            document.getElementById('particleCount').textContent = count;
+        }
+        
+        function drawAtMouse(x, y) {
+            const cellX = Math.floor(x / CELL_SIZE);
+            const cellY = Math.floor(y / CELL_SIZE);
+            
+            for (let dy = -brushSize; dy <= brushSize; dy++) {
+                for (let dx = -brushSize; dx <= brushSize; dx++) {
+                    if (dx * dx + dy * dy <= brushSize * brushSize) {
+                        const nx = cellX + dx;
+                        const ny = cellY + dy;
+                        if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
+                            if (currentElement === EMPTY || grid[ny][nx].type === EMPTY) {
+                                grid[ny][nx] = {
+                                    type: currentElement,
+                                    color: currentElement !== EMPTY ? colors[currentElement]() : null,
+                                    updated: false
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Event listeners
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            drawAtMouse(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            drawAtMouse(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mouseleave', () => isDrawing = false);
+        
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            drawAtMouse(touch.clientX - rect.left, touch.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            drawAtMouse(touch.clientX - rect.left, touch.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('touchend', () => isDrawing = false);
+        
+        // Element buttons
+        const elementMap = {
+            'sand': SAND, 'water': WATER, 'fire': FIRE, 'wood': WOOD,
+            'plant': PLANT, 'stone': STONE, 'oil': OIL, 'acid': ACID,
+            'lava': LAVA, 'ice': ICE, 'empty': EMPTY
+        };
+        
+        document.querySelectorAll('.element-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.element-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentElement = elementMap[btn.dataset.element];
+            });
+        });
+        
+        // Brush size
+        const brushSlider = document.getElementById('brushSize');
+        brushSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            document.getElementById('sizeValue').textContent = brushSize;
+        });
+        
+        // Clear button
+        document.getElementById('clearBtn').addEventListener('click', initGrid);
+        
+        // Keyboard shortcuts
+        const keyMap = {
+            '1': 'sand', '2': 'water', '3': 'fire', '4': 'wood', '5': 'plant',
+            '6': 'stone', '7': 'oil', '8': 'acid', '9': 'lava', '0': 'ice', 'e': 'eraser'
+        };
+        
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (keyMap[key]) {
+                document.querySelectorAll('.element-btn').forEach(b => b.classList.remove('active'));
+                const btn = document.getElementById(keyMap[key]);
+                if (btn) {
+                    btn.classList.add('active');
+                    currentElement = elementMap[btn.dataset.element];
+                }
+            }
+            if (key === 'c') initGrid();
+            if (key === '[') {
+                brushSize = Math.max(1, brushSize - 1);
+                brushSlider.value = brushSize;
+                document.getElementById('sizeValue').textContent = brushSize;
+            }
+            if (key === ']') {
+                brushSize = Math.min(15, brushSize + 1);
+                brushSlider.value = brushSize;
+                document.getElementById('sizeValue').textContent = brushSize;
+            }
+        });
+        
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        initGrid();
+        gameLoop();
+    </script>
+</body>
+</html>

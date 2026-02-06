@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAL's Pinball</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        #gameCanvas {
+            border: 4px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255, 50, 50, 0.3), inset 0 0 50px rgba(0,0,0,0.5);
+        }
+        .sidebar {
+            color: #ff3333;
+            width: 200px;
+        }
+        .score-panel {
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .score-panel h2 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .score-panel .value {
+            font-size: 32px;
+            color: #ff3333;
+            text-shadow: 0 0 10px rgba(255, 50, 50, 0.5);
+        }
+        .controls {
+            background: #111;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 20px;
+            font-size: 12px;
+            color: #888;
+            line-height: 1.8;
+        }
+        .controls h3 {
+            color: #ff3333;
+            margin-bottom: 10px;
+        }
+        .controls kbd {
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 3px;
+            padding: 2px 6px;
+            color: #fff;
+        }
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 40px;
+            border-radius: 10px;
+            border: 2px solid #ff3333;
+            text-align: center;
+            display: none;
+        }
+        .game-over h1 {
+            color: #ff3333;
+            margin-bottom: 20px;
+        }
+        .game-over p {
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        .game-over button {
+            background: #ff3333;
+            color: #fff;
+            border: none;
+            padding: 10px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-family: inherit;
+        }
+        .game-over button:hover {
+            background: #ff5555;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="700"></canvas>
+        <div class="sidebar">
+            <div class="score-panel">
+                <h2>SCORE</h2>
+                <div class="value" id="score">0</div>
+            </div>
+            <div class="score-panel">
+                <h2>HIGH SCORE</h2>
+                <div class="value" id="highScore">0</div>
+            </div>
+            <div class="score-panel">
+                <h2>BALLS</h2>
+                <div class="value" id="balls">3</div>
+            </div>
+            <div class="score-panel">
+                <h2>MULTIPLIER</h2>
+                <div class="value" id="multiplier">1x</div>
+            </div>
+            <div class="controls">
+                <h3>CONTROLS</h3>
+                <p><kbd>A</kbd> / <kbd>←</kbd> Left Flipper</p>
+                <p><kbd>D</kbd> / <kbd>→</kbd> Right Flipper</p>
+                <p><kbd>Space</kbd> Launch Ball</p>
+                <p><kbd>R</kbd> Reset Game</p>
+            </div>
+        </div>
+    </div>
+    <div class="game-over" id="gameOver">
+        <h1>GAME OVER</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <button onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game state
+        let score = 0;
+        let highScore = localStorage.getItem('pinballHighScore') || 0;
+        let balls = 3;
+        let multiplier = 1;
+        let gameActive = false;
+        let ballInPlay = false;
+        let plungerPower = 0;
+        let plungerCharging = false;
+        
+        // Physics constants
+        const GRAVITY = 0.15;
+        const FRICTION = 0.995;
+        const BOUNCE_DAMPING = 0.7;
+        const FLIPPER_FORCE = 18;
+        
+        // Ball
+        let ball = {
+            x: 375,
+            y: 600,
+            vx: 0,
+            vy: 0,
+            radius: 10
+        };
+        
+        // Flippers
+        const flippers = {
+            left: {
+                x: 100,
+                y: 620,
+                length: 70,
+                angle: 0.4,
+                targetAngle: 0.4,
+                maxAngle: -0.6,
+                speed: 0.35,
+                direction: 1
+            },
+            right: {
+                x: 300,
+                y: 620,
+                length: 70,
+                angle: Math.PI - 0.4,
+                targetAngle: Math.PI - 0.4,
+                maxAngle: Math.PI + 0.6,
+                speed: 0.35,
+                direction: -1
+            }
+        };
+        
+        // Bumpers
+        const bumpers = [
+            { x: 200, y: 180, radius: 30, points: 100, hit: false, color: '#ff3333' },
+            { x: 130, y: 250, radius: 25, points: 100, hit: false, color: '#33ff33' },
+            { x: 270, y: 250, radius: 25, points: 100, hit: false, color: '#3333ff' },
+            { x: 200, y: 320, radius: 25, points: 150, hit: false, color: '#ffff33' },
+            { x: 100, y: 150, radius: 20, points: 200, hit: false, color: '#ff33ff' },
+            { x: 300, y: 150, radius: 20, points: 200, hit: false, color: '#33ffff' }
+        ];
+        
+        // Targets
+        const targets = [
+            { x: 50, y: 300, width: 10, height: 40, points: 500, hit: false, color: '#ff9933' },
+            { x: 340, y: 300, width: 10, height: 40, points: 500, hit: false, color: '#ff9933' },
+            { x: 50, y: 400, width: 10, height: 40, points: 250, hit: false, color: '#9933ff' },
+            { x: 340, y: 400, width: 10, height: 40, points: 250, hit: false, color: '#9933ff' }
+        ];
+        
+        // Slingshots (triangular bumpers near flippers)
+        const slingshots = [
+            { points: [{x: 60, y: 520}, {x: 60, y: 600}, {x: 120, y: 580}], active: false },
+            { points: [{x: 340, y: 520}, {x: 340, y: 600}, {x: 280, y: 580}], active: false }
+        ];
+        
+        // Walls
+        const walls = [
+            // Left wall
+            { x1: 20, y1: 100, x2: 20, y2: 650 },
+            // Right wall (with plunger lane)
+            { x1: 350, y1: 100, x2: 350, y2: 500 },
+            { x1: 380, y1: 100, x2: 380, y2: 650 },
+            // Top curve approximation
+            { x1: 20, y1: 100, x2: 100, y2: 40 },
+            { x1: 100, y1: 40, x2: 300, y2: 40 },
+            { x1: 300, y1: 40, x2: 380, y2: 100 },
+            // Plunger lane entrance
+            { x1: 350, y1: 500, x2: 350, y2: 520 },
+            // Guide rails near flippers
+            { x1: 20, y1: 550, x2: 60, y2: 520 },
+            { x1: 380, y1: 550, x2: 340, y2: 520 }
+        ];
+        
+        // Ramp zones (bonus scoring areas)
+        const ramps = [
+            { x: 150, y: 80, width: 100, height: 30, points: 1000, label: 'SKILL SHOT', cooldown: 0 }
+        ];
+        
+        // Input state
+        const keys = {
+            left: false,
+            right: false,
+            space: false
+        };
+        
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+                keys.left = true;
+                flippers.left.targetAngle = flippers.left.maxAngle;
+            }
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+                keys.right = true;
+                flippers.right.targetAngle = flippers.right.maxAngle;
+            }
+            if (e.key === ' ' && !ballInPlay && balls > 0) {
+                e.preventDefault();
+                if (!plungerCharging) {
+                    plungerCharging = true;
+                    plungerPower = 0;
+                }
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                resetGame();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+                keys.left = false;
+                flippers.left.targetAngle = 0.4;
+            }
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+                keys.right = false;
+                flippers.right.targetAngle = Math.PI - 0.4;
+            }
+            if (e.key === ' ' && plungerCharging) {
+                launchBall();
+            }
+        });
+        
+        function launchBall() {
+            plungerCharging = false;
+            ballInPlay = true;
+            gameActive = true;
+            ball.vy = -plungerPower * 0.3 - 8;
+            ball.vx = -1;
+            plungerPower = 0;
+        }
+        
+        function resetBall() {
+            ball.x = 375;
+            ball.y = 600;
+            ball.vx = 0;
+            ball.vy = 0;
+            ballInPlay = false;
+            
+            // Reset targets for next ball
+            targets.forEach(t => t.hit = false);
+        }
+        
+        function loseBall() {
+            balls--;
+            document.getElementById('balls').textContent = balls;
+            
+            if (balls <= 0) {
+                gameOver();
+            } else {
+                multiplier = 1;
+                document.getElementById('multiplier').textContent = '1x';
+                resetBall();
+            }
+        }
+        
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('finalScore').textContent = score;
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('pinballHighScore', highScore);
+                document.getElementById('highScore').textContent = highScore;
+            }
+        }
+        
+        function resetGame() {
+            score = 0;
+            balls = 3;
+            multiplier = 1;
+            gameActive = false;
+            ballInPlay = false;
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('balls').textContent = '3';
+            document.getElementById('multiplier').textContent = '1x';
+            document.getElementById('highScore').textContent = highScore;
+            document.getElementById('gameOver').style.display = 'none';
+            
+            bumpers.forEach(b => b.hit = false);
+            targets.forEach(t => t.hit = false);
+            
+            resetBall();
+        }
+        
+        function addScore(points) {
+            score += points * multiplier;
+            document.getElementById('score').textContent = score;
+        }
+        
+        function increaseMultiplier() {
+            if (multiplier < 5) {
+                multiplier++;
+                document.getElementById('multiplier').textContent = multiplier + 'x';
+            }
+        }
+        
+        // Physics functions
+        function updateFlippers() {
+            // Left flipper
+            if (flippers.left.angle < flippers.left.targetAngle) {
+                flippers.left.angle += flippers.left.speed;
+                if (flippers.left.angle > flippers.left.targetAngle) {
+                    flippers.left.angle = flippers.left.targetAngle;
+                }
+            } else if (flippers.left.angle > flippers.left.targetAngle) {
+                flippers.left.angle -= flippers.left.speed;
+                if (flippers.left.angle < flippers.left.targetAngle) {
+                    flippers.left.angle = flippers.left.targetAngle;
+                }
+            }
+            
+            // Right flipper
+            if (flippers.right.angle < flippers.right.targetAngle) {
+                flippers.right.angle += flippers.right.speed;
+                if (flippers.right.angle > flippers.right.targetAngle) {
+                    flippers.right.angle = flippers.right.targetAngle;
+                }
+            } else if (flippers.right.angle > flippers.right.targetAngle) {
+                flippers.right.angle -= flippers.right.speed;
+                if (flippers.right.angle < flippers.right.targetAngle) {
+                    flippers.right.angle = flippers.right.targetAngle;
+                }
+            }
+        }
+        
+        function checkFlipperCollision(flipper, isLeft) {
+            const endX = flipper.x + Math.cos(flipper.angle) * flipper.length;
+            const endY = flipper.y + Math.sin(flipper.angle) * flipper.length;
+            
+            // Line segment collision
+            const dx = endX - flipper.x;
+            const dy = endY - flipper.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const nx = -dy / len;
+            const ny = dx / len;
+            
+            // Distance from ball to line
+            const t = Math.max(0, Math.min(1, 
+                ((ball.x - flipper.x) * dx + (ball.y - flipper.y) * dy) / (len * len)
+            ));
+            
+            const closestX = flipper.x + t * dx;
+            const closestY = flipper.y + t * dy;
+            const distX = ball.x - closestX;
+            const distY = ball.y - closestY;
+            const dist = Math.sqrt(distX * distX + distY * distY);
+            
+            if (dist < ball.radius + 5) {
+                // Push ball out
+                const overlap = ball.radius + 5 - dist;
+                ball.x += (distX / dist) * overlap;
+                ball.y += (distY / dist) * overlap;
+                
+                // Calculate flipper velocity at contact point
+                const flipperMoving = isLeft ? 
+                    (keys.left && flippers.left.angle > flippers.left.maxAngle + 0.1) :
+                    (keys.right && flippers.right.angle < flippers.right.maxAngle - 0.1);
+                
+                if (flipperMoving) {
+                    // Strong hit when flipper is actively moving
+                    const hitAngle = isLeft ? -0.8 : Math.PI + 0.8;
+                    ball.vx = Math.cos(hitAngle) * FLIPPER_FORCE;
+                    ball.vy = Math.sin(hitAngle) * FLIPPER_FORCE;
+                } else {
+                    // Bounce off stationary flipper
+                    const dot = ball.vx * nx + ball.vy * ny;
+                    ball.vx = (ball.vx - 2 * dot * nx) * BOUNCE_DAMPING;
+                    ball.vy = (ball.vy - 2 * dot * ny) * BOUNCE_DAMPING;
+                }
+            }
+        }
+        
+        function checkBumperCollision(bumper) {
+            const dx = ball.x - bumper.x;
+            const dy = ball.y - bumper.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < ball.radius + bumper.radius) {
+                // Bounce
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const overlap = ball.radius + bumper.radius - dist;
+                
+                ball.x += nx * overlap;
+                ball.y += ny * overlap;
+                
+                // Strong bounce from bumper
+                const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                const bounceSpeed = Math.max(speed * 1.1, 8);
+                ball.vx = nx * bounceSpeed;
+                ball.vy = ny * bounceSpeed;
+                
+                // Score
+                addScore(bumper.points);
+                bumper.hit = true;
+                setTimeout(() => bumper.hit = false, 100);
+                
+                return true;
+            }
+            return false;
+        }
+        
+        function checkTargetCollision(target) {
+            if (target.hit) return false;
+            
+            if (ball.x + ball.radius > target.x && 
+                ball.x - ball.radius < target.x + target.width &&
+                ball.y + ball.radius > target.y && 
+                ball.y - ball.radius < target.y + target.height) {
+                
+                target.hit = true;
+                addScore(target.points);
+                increaseMultiplier();
+                
+                // Bounce off
+                if (target.x < 100) {
+                    ball.vx = Math.abs(ball.vx) * 0.8;
+                } else {
+                    ball.vx = -Math.abs(ball.vx) * 0.8;
+                }
+                
+                return true;
+            }
+            return false;
+        }
+        
+        function checkWallCollision(wall) {
+            const dx = wall.x2 - wall.x1;
+            const dy = wall.y2 - wall.y1;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const nx = -dy / len;
+            const ny = dx / len;
+            
+            const t = Math.max(0, Math.min(1,
+                ((ball.x - wall.x1) * dx + (ball.y - wall.y1) * dy) / (len * len)
+            ));
+            
+            const closestX = wall.x1 + t * dx;
+            const closestY = wall.y1 + t * dy;
+            const distX = ball.x - closestX;
+            const distY = ball.y - closestY;
+            const dist = Math.sqrt(distX * distX + distY * distY);
+            
+            if (dist < ball.radius) {
+                const overlap = ball.radius - dist;
+                ball.x += (distX / dist) * overlap;
+                ball.y += (distY / dist) * overlap;
+                
+                const dot = ball.vx * (distX/dist) + ball.vy * (distY/dist);
+                ball.vx = (ball.vx - 2 * dot * (distX/dist)) * BOUNCE_DAMPING;
+                ball.vy = (ball.vy - 2 * dot * (distY/dist)) * BOUNCE_DAMPING;
+            }
+        }
+        
+        function checkRampCollision(ramp) {
+            if (ramp.cooldown > 0) return;
+            
+            if (ball.x > ramp.x && ball.x < ramp.x + ramp.width &&
+                ball.y > ramp.y && ball.y < ramp.y + ramp.height &&
+                ball.vy < 0) {
+                addScore(ramp.points);
+                ramp.cooldown = 60;
+            }
+        }
+        
+        function update() {
+            if (!ballInPlay) {
+                if (plungerCharging) {
+                    plungerPower = Math.min(plungerPower + 1, 50);
+                }
+                return;
+            }
+            
+            // Apply gravity
+            ball.vy += GRAVITY;
+            
+            // Apply friction
+            ball.vx *= FRICTION;
+            ball.vy *= FRICTION;
+            
+            // Update position
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            
+            // Update flippers
+            updateFlippers();
+            
+            // Check collisions
+            checkFlipperCollision(flippers.left, true);
+            checkFlipperCollision(flippers.right, false);
+            
+            bumpers.forEach(checkBumperCollision);
+            targets.forEach(checkTargetCollision);
+            walls.forEach(checkWallCollision);
+            ramps.forEach(checkRampCollision);
+            
+            // Update ramp cooldowns
+            ramps.forEach(r => { if (r.cooldown > 0) r.cooldown--; });
+            
+            // Simple boundary checks
+            if (ball.x < ball.radius + 20) {
+                ball.x = ball.radius + 20;
+                ball.vx = Math.abs(ball.vx) * BOUNCE_DAMPING;
+            }
+            if (ball.x > 380 - ball.radius) {
+                ball.x = 380 - ball.radius;
+                ball.vx = -Math.abs(ball.vx) * BOUNCE_DAMPING;
+            }
+            if (ball.y < ball.radius + 40) {
+                ball.y = ball.radius + 40;
+                ball.vy = Math.abs(ball.vy) * BOUNCE_DAMPING;
+            }
+            
+            // Ball lost
+            if (ball.y > 720) {
+                loseBall();
+            }
+        }
+        
+        function drawFlipper(flipper, isLeft) {
+            const endX = flipper.x + Math.cos(flipper.angle) * flipper.length;
+            const endY = flipper.y + Math.sin(flipper.angle) * flipper.length;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#ff3333';
+            ctx.lineWidth = 12;
+            ctx.lineCap = 'round';
+            ctx.moveTo(flipper.x, flipper.y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Flipper pivot
+            ctx.beginPath();
+            ctx.fillStyle = '#ff5555';
+            ctx.arc(flipper.x, flipper.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw playfield background gradient
+            const gradient = ctx.createRadialGradient(200, 350, 0, 200, 350, 400);
+            gradient.addColorStop(0, '#2a2a4e');
+            gradient.addColorStop(1, '#1a1a2e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw walls
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 4;
+            walls.forEach(wall => {
+                ctx.beginPath();
+                ctx.moveTo(wall.x1, wall.y1);
+                ctx.lineTo(wall.x2, wall.y2);
+                ctx.stroke();
+            });
+            
+            // Draw plunger lane
+            ctx.fillStyle = '#111';
+            ctx.fillRect(350, 500, 30, 200);
+            
+            // Draw plunger
+            const plungerY = 680 - plungerPower;
+            ctx.fillStyle = '#ff3333';
+            ctx.fillRect(358, plungerY, 14, 20);
+            ctx.fillStyle = '#aa2222';
+            ctx.fillRect(355, plungerY + 20, 20, 5);
+            
+            // Draw ramps
+            ramps.forEach(ramp => {
+                ctx.fillStyle = ramp.cooldown > 0 ? '#ffff00' : '#333355';
+                ctx.fillRect(ramp.x, ramp.y, ramp.width, ramp.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(ramp.label, ramp.x + ramp.width/2, ramp.y + 20);
+            });
+            
+            // Draw bumpers
+            bumpers.forEach(bumper => {
+                // Glow effect
+                if (bumper.hit) {
+                    ctx.beginPath();
+                    ctx.fillStyle = bumper.color + '44';
+                    ctx.arc(bumper.x, bumper.y, bumper.radius + 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Bumper body
+                ctx.beginPath();
+                const grad = ctx.createRadialGradient(
+                    bumper.x - 5, bumper.y - 5, 0,
+                    bumper.x, bumper.y, bumper.radius
+                );
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.3, bumper.color);
+                grad.addColorStop(1, '#000000');
+                ctx.fillStyle = bumper.hit ? '#ffffff' : grad;
+                ctx.arc(bumper.x, bumper.y, bumper.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Bumper ring
+                ctx.beginPath();
+                ctx.strokeStyle = bumper.hit ? '#ffffff' : '#888888';
+                ctx.lineWidth = 3;
+                ctx.arc(bumper.x, bumper.y, bumper.radius + 3, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+            
+            // Draw targets
+            targets.forEach(target => {
+                if (!target.hit) {
+                    ctx.fillStyle = target.color;
+                    ctx.fillRect(target.x, target.y, target.width, target.height);
+                    
+                    // Glow
+                    ctx.shadowColor = target.color;
+                    ctx.shadowBlur = 10;
+                    ctx.fillRect(target.x, target.y, target.width, target.height);
+                    ctx.shadowBlur = 0;
+                } else {
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(target.x, target.y, target.width, target.height);
+                }
+            });
+            
+            // Draw slingshot areas
+            slingshots.forEach(sling => {
+                ctx.beginPath();
+                ctx.fillStyle = '#332244';
+                ctx.moveTo(sling.points[0].x, sling.points[0].y);
+                ctx.lineTo(sling.points[1].x, sling.points[1].y);
+                ctx.lineTo(sling.points[2].x, sling.points[2].y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#ff3333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            // Draw flippers
+            drawFlipper(flippers.left, true);
+            drawFlipper(flippers.right, false);
+            
+            // Draw ball
+            if (ballInPlay || balls > 0) {
+                // Ball shadow
+                ctx.beginPath();
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.arc(ball.x + 3, ball.y + 3, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Ball
+                const ballGrad = ctx.createRadialGradient(
+                    ball.x - 3, ball.y - 3, 0,
+                    ball.x, ball.y, ball.radius
+                );
+                ballGrad.addColorStop(0, '#ffffff');
+                ballGrad.addColorStop(0.5, '#cccccc');
+                ballGrad.addColorStop(1, '#888888');
+                ctx.beginPath();
+                ctx.fillStyle = ballGrad;
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw drain danger zone
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+            ctx.fillRect(20, 650, 330, 50);
+            
+            // Instructions if ball not in play
+            if (!ballInPlay && balls > 0) {
+                ctx.fillStyle = '#ff3333';
+                ctx.font = '16px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('HOLD SPACE TO CHARGE', 200, 400);
+                ctx.fillText('RELEASE TO LAUNCH', 200, 420);
+            }
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize
+        document.getElementById('highScore').textContent = highScore;
+        resetGame();
+        gameLoop();
+    </script>
+</body>
+</html>
