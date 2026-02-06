@@ -2,6 +2,9 @@
 
 A self-hosted AI assistant configuration built on [OpenClaw](https://github.com/openclaw/openclaw), featuring custom personality, persistent memory, and interactive web applications.
 
+### 🎮 Live Demos
+> **[Play Pinball](https://toddni8022.github.io/open-claw/pinball/)** | **[Play Falling Sand](https://toddni8022.github.io/open-claw/falling-sand/)**
+
 ## Overview
 
 This repository contains my personal AI workspace — a fully configured assistant named HAL (yes, after *that* HAL) with persistent memory across sessions, custom behavioral guidelines, and interactive projects built through human-AI collaboration.
@@ -26,7 +29,7 @@ A complete browser-based pinball game featuring:
 - **Scoring system** — multipliers up to 5x, high score persistence
 - **Controls** — A/D or Arrow keys for flippers, Space to launch
 
-**[Play it live](pinball/index.html)** — just open in any modern browser.
+**[▶️ Play Pinball](https://toddni8022.github.io/open-claw/pinball/)** — runs in any modern browser.
 
 ### Falling Sand
 A particle simulation sandbox where different elements interact:
@@ -35,7 +38,7 @@ A particle simulation sandbox where different elements interact:
 - **Element interactions** — lava + water = stone, ice freezes water, oil floats
 - **Touch-friendly** — works on mobile devices
 
-**[Play it live](falling-sand/index.html)** — click and drag to paint elements.
+**[▶️ Play Falling Sand](https://toddni8022.github.io/open-claw/falling-sand/)** — click and drag to paint elements.
 
 ## 🧠 AI Configuration
 
