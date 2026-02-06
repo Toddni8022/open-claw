@@ -84,6 +84,14 @@ open pinball/index.html
 open falling-sand/index.html
 ```
 
+### Local Development (recommended)
+Some browsers restrict `file://` access for local assets. A tiny local server avoids that:
+```bash
+# From the repo root
+python -m http.server 8000
+# Then open: http://localhost:8000/pinball/ or /falling-sand/
+```
+
 ### Set Up Your Own AI Workspace
 1. Install [OpenClaw](https://docs.openclaw.ai)
 2. Clone this repo to your workspace directory
@@ -110,6 +118,12 @@ open falling-sand/index.html
 ├── TOOLS.md            # Local tool configurations
 └── HEARTBEAT.md        # Periodic task checklist
 ```
+
+## 🧩 Contributing
+If you want to extend the games or the AI workspace:
+1. Fork the repo and create a feature branch
+2. Keep changes focused and well-documented
+3. Open a PR with a clear summary and screenshots (for UI changes)
 
 ## 🎯 Why This Exists
 
