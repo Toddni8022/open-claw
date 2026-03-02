@@ -11,14 +11,25 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # Temporary files
 *.tmp
 *.temp
 
-# Node modules (if any future projects use them)
+# Node modules and build artifacts
 node_modules/
+dist/
+build/
+coverage/
+.cache/
+.eslintcache
 
 # Environment files with secrets
 .env
 .env.local
+.env.*.local
+
+# Package manager lock files (keep package-lock.json)
+yarn.lock
+pnpm-lock.yaml
