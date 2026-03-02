@@ -1,0 +1,28 @@
+{
+  "name": "open-claw",
+  "version": "1.0.0",
+  "description": "OpenClaw web games and AI workspace — browser-based games built with vanilla JavaScript and HTML5 Canvas",
+  "keywords": ["game", "browser-game", "javascript", "canvas", "pinball", "falling-sand"],
+  "homepage": "https://toddni8022.github.io/open-claw/",
+  "bugs": {
+    "url": "https://github.com/Toddni8022/open-claw/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Toddni8022/open-claw.git"
+  },
+  "license": "MIT",
+  "author": "Todd Nicholas",
+  "scripts": {
+    "start": "npx serve .",
+    "lint": "npm run lint:html && npm run lint:js",
+    "lint:html": "htmlhint \"pinball/index.html\" \"falling-sand/index.html\"",
+    "lint:js": "eslint --ext .html pinball/ falling-sand/",
+    "test": "echo 'No automated tests yet. See tests/README.md' && exit 0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-plugin-html": "^8.1.2",
+    "htmlhint": "^1.1.4"
+  }
+}
